@@ -1,0 +1,35 @@
+name: NASDAQ Watch
+
+on:
+  schedule:
+    # כל 15 דקות
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Restore history cache
+        uses: actions/cache@v4
+        with:
+          path: cache
+          key: nasdaq-cache-
+          restore-keys: |
+            nasdaq-cache-
+
+      - name: Run watch scan
+        run: python3 scanner.py --brief --universe 2000 --etf-limit 625 --top 20
+
+      - name: Deliver on change
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
+        run: python3 cloud/deliver.py --mode watch

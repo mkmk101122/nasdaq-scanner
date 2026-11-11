@@ -1,0 +1,35 @@
+name: NASDAQ Favorites
+
+on:
+  schedule:
+    # 16:20 Asia/Jerusalem (winter, UTC+2) -> 14:20 UTC
+    - cron: "20 14 * * *"
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Restore history cache
+        uses: actions/cache@v4
+        with:
+          path: cache
+          key: nasdaq-cache-
+          restore-keys: |
+            nasdaq-cache-
+
+      - name: Run favorites scan
+        run: python3 scanner.py --brief --universe 2000 --etf-limit 625 --top 20
+
+      - name: Deliver
+        env:
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT: ${{ secrets.TELEGRAM_CHAT }}
+        run: python3 cloud/deliver.py --mode brief
