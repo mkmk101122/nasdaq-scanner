@@ -56,6 +56,12 @@ CONFIG = {
     "cache_dir": "cache",
     "watchlist_file": "watchlist.json",
     "favorites_min_score": 12,   # סף ציון למועדפים מול הפתיחה
+    # --- מסנני איכות סיגנל (שיפור אסטרטגיה) ---
+    "adx_min": 20.0,             # ADX מינימלי — עוצמת מגמה (מסנן שוק לטיני/רוח)
+    "max_atr_pct": 8.0,          # ATR% מקסימלי — תנודתיות סבירה (מסנן סיכון מוגזם)
+    "vol_trend_days": 5,         # מחזור 5 ימים מול 20 — אישור מחזור עולה
+    "regime_enabled": True,      # מסנן מצב שוק (לא לסרוק נגד המגמה הרחבה)
+    "regime_symbol": "SPY",      # סימבול מצב שוק
 }
 
 BASE = "https://api.nasdaq.com/api"
@@ -346,6 +352,30 @@ def fetch_market_status():
     return data.get("marketStatus") or "Unknown", data.get("primaryData", {}).get("lastTradeTimestamp")
 
 
+def fetch_regime(symbol=None, refresh=False):
+    """מצב שוק לפי SPY: bull / bear / neutral — מגמת השוק הרחב.
+
+    bull  : מחיר מעל SMA50 ו-SMA50 מעל SMA200 (מגמת עלייה)
+    bear  : מחיר מתחת ל-SMA50 ו-SMA50 מתחת ל-SMA200 (מגמת ירידה)
+    neutral: כל מצב אחר
+    """
+    sym = symbol or CONFIG.get("regime_symbol", "SPY")
+    hist = fetch_history(sym, refresh=refresh, assetclass="etf")
+    if not hist:
+        return None
+    closes = [h["close"] for h in hist]
+    sma50 = sma(closes, 50)
+    sma200 = sma(closes, 200)
+    last = closes[-1]
+    if sma50 is None or sma200 is None:
+        return None
+    if last > sma50 > sma200:
+        return "bull"
+    if last < sma50 < sma200:
+        return "bear"
+    return "neutral"
+
+
 # --------------------------------------------------------------------------
 # אינדיקטורים (טהור, ללא pandas)
 # --------------------------------------------------------------------------
@@ -418,10 +448,46 @@ def atr(highs, lows, closes, n=14):
     return a
 
 
+def adx(highs, lows, closes, n=14):
+    """ADX (Wilder) — עוצמת מגמה 0-100 (גבוה = מגמה חזקה, נמוך = שוק לטיני)."""
+    if len(closes) < 2 * n + 1:
+        return None
+    trs, pdm, ndm = [], [], []
+    for i in range(1, len(closes)):
+        up = highs[i] - highs[i - 1]
+        dn = lows[i - 1] - lows[i]
+        pdm.append(up if up > dn and up > 0 else 0.0)
+        ndm.append(dn if dn > up and dn > 0 else 0.0)
+        trs.append(max(
+            highs[i] - lows[i],
+            abs(highs[i] - closes[i - 1]),
+            abs(lows[i] - closes[i - 1]),
+        ))
+    atr_w = sum(trs[:n])
+    pdi_w = sum(pdm[:n])
+    ndi_w = sum(ndm[:n])
+    dxs = []
+    for i in range(n, len(trs)):
+        atr_w = atr_w - atr_w / n + trs[i]
+        pdi_w = pdi_w - pdi_w / n + pdm[i]
+        ndi_w = ndi_w - ndi_w / n + ndm[i]
+        if atr_w > 0:
+            pdi = 100.0 * pdi_w / atr_w
+            ndi = 100.0 * ndi_w / atr_w
+            s = pdi + ndi
+            dxs.append(100.0 * abs(pdi - ndi) / s if s > 0 else 0.0)
+    if len(dxs) < n:
+        return None
+    a = sum(dxs[:n]) / n
+    for d in dxs[n:]:
+        a = (a * (n - 1) + d) / n
+    return a
+
+
 # --------------------------------------------------------------------------
 # ניתוח וציון
 # --------------------------------------------------------------------------
-def analyze(row, hist):
+def analyze(row, hist, regime=None):
     closes = [h["close"] for h in hist]
     highs = [h["high"] for h in hist]
     lows = [h["low"] for h in hist]
@@ -438,8 +504,12 @@ def analyze(row, hist):
     m = macd(closes)
     m_line, m_sig, m_hist, m_hist_prev = m if m else (None, None, None, None)
     a = atr(highs, lows, closes, 14)
+    adx_v = adx(highs, lows, closes, 14)
     vol20 = sma(vols, 20) or 0
     vol_ratio = vols[-1] / vol20 if vol20 else 0.0
+    vol5 = sma(vols, 5) or 0
+    vol_trend = (vol5 / vol20) if vol20 else 0.0
+    atr_pct = (a / last * 100.0) if (a and last) else None
 
     hi252 = max(highs[-252:]) if n >= 252 else max(highs)
     lo252 = min(lows[-252:]) if n >= 252 else min(lows)
@@ -515,6 +585,26 @@ def analyze(row, hist):
     else:
         return None
 
+    # --- מסנני איכות סיגנל (שיפור אסטרטגיה) ---
+    # 1) מצב שוק: לא לסרוק נגד המגמה הרחבה (SPY)
+    if regime and CONFIG.get("regime_enabled", True):
+        if regime == "bear" and direction == "LONG":
+            return None
+        if regime == "bull" and direction == "SHORT":
+            return None
+    # 2) עוצמת מגמה: ADX נמוך = שוק לטיני, סיגנל מומנטום מטעה
+    adx_min = CONFIG.get("adx_min", 0.0) or 0.0
+    if adx_v is not None and adx_min and adx_v < adx_min:
+        return None
+    # 3) תנודתיות: ATR% גבוה מדי = סטופ רחב וסיכון מוגזם
+    max_atr = CONFIG.get("max_atr_pct", 0.0) or 0.0
+    if atr_pct is not None and max_atr and atr_pct > max_atr:
+        return None
+    # 4) מחזור עולה: אישור שהמחזור גדל ב-5 הימים האחרונים מול 20
+    vt_days = CONFIG.get("vol_trend_days", 0) or 0
+    if vt_days and vol_trend < 1.0:
+        return None
+
     live_price = row.get("price") or last  # מחיר שוטף מהסריקה (לכניסה)
 
     # מדד איכות רציף לדירוג משנה כשהציון זהה
@@ -525,7 +615,13 @@ def analyze(row, hist):
     rsi_q = max(min(rsi_q, 1.0), -1.0)
     dist_q = ((last - sma50) if direction == "LONG" else (sma50 - last)) / (a or (last * 0.02))
     dist_q = max(min(dist_q, 0.20), -0.20) / 0.20
-    quality = vol_q * 1.5 + mom_q * 2.0 + rsi_q * 2.0 + pos20 * 1.5 + dist_q * 2.0
+    adx_q = (adx_v / 40.0) if adx_v is not None else 0.0
+    adx_q = max(min(adx_q, 1.0), 0.0)
+    voltr_q = max(min(vol_trend, 2.0), 0.0) / 2.0
+    atr_q = 1.0 - (atr_pct / 10.0) if atr_pct is not None else 0.0
+    atr_q = max(min(atr_q, 1.0), -1.0)
+    quality = (vol_q * 1.5 + mom_q * 2.0 + rsi_q * 2.0 + pos20 * 1.5 + dist_q * 2.0
+               + adx_q * 1.5 + voltr_q * 1.0 + atr_q * 1.0)
 
     return {
         "symbol": row["symbol"],
@@ -545,6 +641,10 @@ def analyze(row, hist):
         "macd_hist": m_hist,
         "vol_ratio": vol_ratio,
         "atr": a,
+        "atr_pct": round(atr_pct, 2) if atr_pct is not None else None,
+        "adx": round(adx_v, 1) if adx_v is not None else None,
+        "vol_trend": round(vol_trend, 2),
+        "regime": regime,
         "sma50": sma50,
         "sma200": sma200,
         "ret20": ret20,
@@ -789,7 +889,7 @@ def render_html(signals, meta, trades, etf_top=None):
 <div class="wrap">
   <h1>📈 סורק נאסדק — המלצות יומיות</h1>
   <div class="meta">
-    תאריך: <b>{now}</b> &nbsp;•&nbsp; סטטוס שוק: <b style="color:{status_color}">{status}</b>
+    תאריך: <b>{now}</b> &nbsp;•&nbsp; סטטוס שוק: <b style="color:{status_color}">{status}</b> &nbsp;•&nbsp; מצב שוק: <b>{meta.get('regime') or 'N/A'}</b>
     &nbsp;•&nbsp; סרוקו: <b>{meta['scanned']}</b> &nbsp;•&nbsp; עברו סינון: <b>{meta['passed']}</b>
     &nbsp;•&nbsp; לונג: <b style="color:#34d399">{len(longs)}</b> &nbsp;•&nbsp; שורט: <b style="color:#f87171">{len(shorts)}</b>
   </div>
@@ -828,7 +928,8 @@ def render_markdown(signals, meta, trades, etf_top=None):
     lines = [
         f"# 📈 סורק נאסדק — {meta['now_il']}",
         "",
-        f"**סטטוס שוק:** {meta['market_status']} • **סרוקו:** {meta['scanned']} • "
+        f"**סטטוס שוק:** {meta['market_status']} • **מצב שוק:** {meta.get('regime') or 'N/A'} • "
+        f"**סרוקו:** {meta['scanned']} • "
         f"**לונג:** {len([s for s in signals if s['direction']=='LONG'])} • "
         f"**שורט:** {len([s for s in signals if s['direction']=='SHORT'])}",
         "",
@@ -881,9 +982,10 @@ def run_scan(args, save=True, verbose=True):
         return None
 
     status, ts = fetch_market_status()
+    regime = fetch_regime(refresh=args.refresh) if CONFIG.get("regime_enabled", True) else None
     if verbose:
         print(f"📡 רשימה: {len(stocks)} מניות + {len(etfs)} תעודות סל | "
-              f"סטטוס שוק: {status} ({ts})")
+              f"סטטוס שוק: {status} ({ts}) | מצב שוק: {regime or 'N/A'}")
 
     signals = []
     scanned = 0
@@ -896,7 +998,7 @@ def run_scan(args, save=True, verbose=True):
         scanned += 1
         if not hist:
             return None
-        return analyze(row, hist)
+        return analyze(row, hist, regime)
 
     from concurrent.futures import ThreadPoolExecutor
     with ThreadPoolExecutor(max_workers=CONFIG["workers"]) as ex:
@@ -913,7 +1015,7 @@ def run_scan(args, save=True, verbose=True):
                               assetclass=row.get("assetclass", "stocks"))
             if not h:
                 continue
-            r = analyze(row, h)
+            r = analyze(row, h, regime)
             if r:
                 all_scores.append((r["score"], r["quality"], r["symbol"], r["direction"]))
         all_scores.sort(reverse=True)
@@ -943,6 +1045,7 @@ def run_scan(args, save=True, verbose=True):
     meta = {
         "now_il": now_il,
         "market_status": status,
+        "regime": regime,
         "scanned": len(universe),
         "passed": len(signals),
         "avg_score": avg,
