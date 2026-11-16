@@ -933,8 +933,8 @@ def render_markdown(signals, meta, trades, etf_top=None):
         f"**לונג:** {len([s for s in signals if s['direction']=='LONG'])} • "
         f"**שורט:** {len([s for s in signals if s['direction']=='SHORT'])}",
         "",
-        "| # | מניה | מחיר | כיוון | ציון | RSI | MACD | מחזור | כניסה | סטופ | יעד |",
-        "|---|------|------|-------|------|-----|------|-------|-------|------|-----|",
+        "| # | מניה | מחיר | כיוון | ציון | RSI | MACD | מחזור | כניסה | סטופ | יעד | יעד % | R:R |",
+        "|---|------|------|-------|------|-----|------|-------|-------|------|-----|-------|-----|",
     ]
     for i, (s, t) in enumerate(zip(signals, trades), 1):
         if t is None:
@@ -943,7 +943,8 @@ def render_markdown(signals, meta, trades, etf_top=None):
             f"| {i} | **{s['symbol']}** {s['name'][:22]} | ${s['price']:.2f} | "
             f"{s['direction']} | {s['score']} | {s['rsi']:.0f} | "
             f"{s['macd_hist']:+.3f} | {s['vol_ratio']:.2f}x | ${t['entry']:.2f} | "
-            f"${t['stop']:.2f} (-{t['risk_pct']:.1f}%) | ${t['target']:.2f} (+{t['target_pct']:.1f}%) |"
+            f"${t['stop']:.2f} (-{t['risk_pct']:.1f}%) | ${t['target']:.2f} | "
+            f"+{t['target_pct']:.1f}% | {t['rr']:.1f} |"
         )
     if etf_top:
         lines += [
@@ -1112,7 +1113,8 @@ def run_brief(args):
         gap = " ⚠️פער" if s.get("gap_flag") else ""
         print(f"{i:2}. {s['symbol']:6} {s['direction']:5} ציון {s['score']:2}{gap} | "
               f"מחיר ${s['price']:.2f} (סגירה ${s['close']:.2f}, {fmt_pct(s.get('change_pct'))}) | "
-              f"סטופ ${t['stop']:.2f} | יעד ${t['target']:.2f} | {t['shares']} מניות")
+              f"סטופ ${t['stop']:.2f} (-{t['risk_pct']:.1f}%) | יעד ${t['target']:.2f} (+{t['target_pct']:.1f}%) | "
+              f"R:R {t['rr']:.0f} | {t['shares']} מניות")
     print(f"\n📄 רשימת מעקב: {CONFIG['watchlist_file']}")
     return {"favorites": favs, "meta": meta, "items": items}
 

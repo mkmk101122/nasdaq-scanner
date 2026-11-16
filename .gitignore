@@ -3,3 +3,5 @@ reports/
 __pycache__/
 *.pyc
 watchlist.json
+brief_run.log
+scan_run.log
