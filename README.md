@@ -90,6 +90,7 @@ python3 scanner.py --watch --interval 900 --ttl 3600
 
 בקיץ (IDT, UTC+3) להזיז את הדוח היומי ל-`15 20 * * *`.
 המסירה לטלגרם דרך `cloud/deliver.py` (סודות `TELEGRAM_TOKEN` + `TELEGRAM_CHAT`).
+גיבוי: `TELEGRAM_TOKEN_BACKUP` — אם הבוט הראשי (שי-1212) נכשל, המסר יישלח מהגיבוי (שי-1213).
 היקף: `--universe 2000 --etf-limit 625`.
 
 ### מקומית (Hermes cron) — גיבוי
