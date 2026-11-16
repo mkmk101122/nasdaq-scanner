@@ -43,14 +43,22 @@ def load_watchlist():
 
 
 def fmt_item(item, n):
+    rp = item.get("risk_pct")
+    tp = item.get("target_pct")
+    rr = item.get("rr")
+    stop = (f"סטופ ${item['stop']:.2f} (-{rp:.1f}%)" if rp is not None
+            else f"סטופ ${item['stop']:.2f}")
+    tgt = (f"יעד ${item['target']:.2f} (+{tp:.1f}%)" if tp is not None
+           else f"יעד ${item['target']:.2f}")
+    ratio = f" | R:R {rr:.0f}" if rr is not None else ""
     return (f"{n}. <b>{item['symbol']}</b> {item['direction']} | "
             f"ציון {item['score']} | ${item['price']:.2f} | "
-            f"סטופ ${item['stop']:.2f} | יעד ${item['target']:.2f}")
+            f"{stop} | {tgt}{ratio}")
 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--mode", choices=["daily", "brief", "watch"], required=True)
+    ap.add_argument("--mode", choices=["daily", "brief", "watch", "open"], required=True)
     args = ap.parse_args()
 
     wl = load_watchlist()
@@ -76,6 +84,7 @@ def main():
         "daily": "📊 <b>סורק נאסדק — דוח יומי</b>",
         "brief": "⭐ <b>מועדפים לקראת הפתיחה</b>",
         "watch": "👁 <b>מעקב נאסדק — שינוי ברשימה</b>",
+        "open": "🚀 <b>פתיחת שוק — עדכון כל 5 דקות</b>",
     }
     lines = [f"{titles[args.mode]} | {meta.get('now_il', '')} | "
              f"{meta.get('market_status', '')}"]

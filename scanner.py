@@ -707,7 +707,7 @@ def save_watchlist(favs, meta):
             "close": s.get("close"), "change_pct": s.get("change_pct"),
             "rsi": s["rsi"], "entry": t["entry"], "stop": t["stop"],
             "target": t["target"], "risk_pct": t["risk_pct"],
-            "target_pct": t["target_pct"], "shares": t["shares"],
+            "target_pct": t["target_pct"], "rr": t["rr"], "shares": t["shares"],
         })
     data = {"items": items, "meta": meta, "updated": time.time()}
     try:
