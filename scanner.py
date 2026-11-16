@@ -29,6 +29,18 @@ import time
 
 import requests
 
+# זמן ישראל — הענן (GitHub Actions) רץ ב־UTC, ולכן האזור מוגדר כאן במפורש.
+try:
+    from zoneinfo import ZoneInfo
+    _IL_TZ = ZoneInfo("Asia/Jerusalem")
+except Exception:  # pragma: no cover - Windows ללא חבילת tzdata
+    _IL_TZ = None
+
+
+def israel_now():
+    """שעון ישראל אמיתי (כולל שעון קיץ/חורף), בלי תלות באזור החיצוני."""
+    return dt.datetime.now(_IL_TZ) if _IL_TZ else dt.datetime.now()
+
 # --------------------------------------------------------------------------
 # הגדרות
 # --------------------------------------------------------------------------
@@ -1041,7 +1053,7 @@ def run_scan(args, save=True, verbose=True):
 
     all_trades = [build_trade(s, portfolio) for s in all_signals]
 
-    now_il = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+    now_il = israel_now().strftime("%Y-%m-%d %H:%M")
     avg = sum(s["score"] for s in signals) / len(signals) if signals else 0
     meta = {
         "now_il": now_il,
@@ -1054,7 +1066,7 @@ def run_scan(args, save=True, verbose=True):
 
     html_path = md_path = json_path = None
     if save:
-        stamp = dt.datetime.now().strftime("%Y%m%d_%H%M")
+        stamp = israel_now().strftime("%Y%m%d_%H%M")
         html_path = os.path.join(CONFIG["out_dir"], f"report_{stamp}.html")
         md_path = os.path.join(CONFIG["out_dir"], f"report_{stamp}.md")
         json_path = os.path.join(CONFIG["out_dir"], f"signals_{stamp}.json")
