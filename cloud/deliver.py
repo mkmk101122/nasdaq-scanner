@@ -12,26 +12,33 @@ import os
 import urllib.request
 
 TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
+TOKEN_BACKUP = os.environ.get("TELEGRAM_TOKEN_BACKUP", "")
 CHAT = os.environ.get("TELEGRAM_CHAT", "")
 STATE = os.path.join("cache", "cloud_watch_state.json")
 
+# גיבוי: שי-1212 ראשי, שי-1213 מופעל רק אם הראשי נופל
+TOKENS = [t for t in (TOKEN, TOKEN_BACKUP) if t]
+
 
 def send(text):
-    if not TOKEN or not CHAT:
+    if not TOKENS or not CHAT:
         print("TELEGRAM_TOKEN/TELEGRAM_CHAT חסרים — מדפיס במקום שליחה")
         print(text)
         return False
-    url = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
-    data = json.dumps({"chat_id": CHAT, "text": text,
-                       "parse_mode": "HTML"}).encode("utf-8")
-    req = urllib.request.Request(url, data=data,
-                                 headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=30) as r:
-            return r.status == 200
-    except Exception as exc:
-        print("שליחה נכשלה:", exc)
-        return False
+    for i, tok in enumerate(TOKENS, 1):
+        url = f"https://api.telegram.org/bot{tok}/sendMessage"
+        data = json.dumps({"chat_id": CHAT, "text": text,
+                           "parse_mode": "HTML"}).encode("utf-8")
+        req = urllib.request.Request(url, data=data,
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=30) as r:
+                if r.status == 200:
+                    print(f"נשלח (בוט {i}/{len(TOKENS)})")
+                    return True
+        except Exception as exc:
+            print(f"שליחה נכשלה (בוט {i}/{len(TOKENS)}):", exc)
+    return False
 
 
 def load_watchlist():
