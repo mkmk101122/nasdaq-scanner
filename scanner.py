@@ -499,37 +499,87 @@ def adx(highs, lows, closes, n=14):
 # --------------------------------------------------------------------------
 # ניתוח וציון
 # --------------------------------------------------------------------------
+def _ind_cache_path(sym, bar_date, assetclass="stocks"):
+    prefix = "" if assetclass == "stocks" else f"{assetclass}_"
+    return os.path.join(CONFIG["cache_dir"],
+                        f"ind_{prefix}{sym}_{(bar_date or 'na').replace('/', '-')}.json")
+
+
+def _compute_indicators(closes, highs, lows, vols):
+    """אינדיקטורים יומיים — תלויים רק בנרות סגורים, ולכן נשמרים ליום מסחר אחד."""
+    n = len(closes)
+    last = closes[-1]
+    m = macd(closes)
+    vol20 = sma(vols, 20) or 0
+    vol5 = sma(vols, 5) or 0
+    a = atr(highs, lows, closes, 14)
+    hi20 = max(highs[-20:])
+    lo20 = min(lows[-20:])
+    return {
+        "last": last, "sma20": sma(closes, 20), "sma50": sma(closes, 50),
+        "sma200": sma(closes, 200), "rsi14": rsi(closes, 14),
+        "macd_line": m[0] if m else None, "macd_sig": m[1] if m else None,
+        "macd_hist": m[2] if m else None, "macd_hist_prev": m[3] if m else None,
+        "atr": a, "adx": adx(highs, lows, closes, 14),
+        "vol_ratio": (vols[-1] / vol20) if vol20 else 0.0,
+        "vol_trend": (vol5 / vol20) if vol20 else 0.0,
+        "atr_pct": (a / last * 100.0) if (a and last) else None,
+        "hi252": (max(highs[-252:]) if n >= 252 else max(highs)),
+        "lo252": (min(lows[-252:]) if n >= 252 else min(lows)),
+        "hi20": hi20, "lo20": lo20,
+        "pos20": ((last - lo20) / (hi20 - lo20)) if hi20 > lo20 else 0.5,
+        "ret20": (last / closes[-21] - 1) if n >= 21 else 0.0,
+        "ret60": (last / closes[-61] - 1) if n >= 61 else 0.0,
+    }
+
+
 def analyze(row, hist, regime=None):
     closes = [h["close"] for h in hist]
-    highs = [h["high"] for h in hist]
-    lows = [h["low"] for h in hist]
-    vols = [h["volume"] for h in hist]
     n = len(closes)
     if n < 210:
         return None
 
-    last = closes[-1]
-    sma20 = sma(closes, 20)
-    sma50 = sma(closes, 50)
-    sma200 = sma(closes, 200)
-    rsi14 = rsi(closes, 14)
-    m = macd(closes)
-    m_line, m_sig, m_hist, m_hist_prev = m if m else (None, None, None, None)
-    a = atr(highs, lows, closes, 14)
-    adx_v = adx(highs, lows, closes, 14)
-    vol20 = sma(vols, 20) or 0
-    vol_ratio = vols[-1] / vol20 if vol20 else 0.0
-    vol5 = sma(vols, 5) or 0
-    vol_trend = (vol5 / vol20) if vol20 else 0.0
-    atr_pct = (a / last * 100.0) if (a and last) else None
+    # אינדיקטורים יומיים: נשמרים לפי תאריך הנר האחרון, כך שסריקה חוזרת באותו יום
+    # עולה רק טעינת הערכים (במקום חישוב מחדש) — חלון נתונים קצר בהרבה.
+    assetclass = row.get("assetclass", "stocks")
+    bar_date = (hist[-1].get("date") or "").strip()
+    ind = None
+    if bar_date:
+        cp = _ind_cache_path(row["symbol"], bar_date, assetclass)
+        try:
+            if time.time() - os.path.getmtime(cp) < CONFIG["cache_ttl"]:
+                with open(cp, "r", encoding="utf-8") as f:
+                    ind = json.load(f)
+        except Exception:
+            ind = None
+    if not ind:
+        ind = _compute_indicators(closes, [h["high"] for h in hist],
+                                  [h["low"] for h in hist],
+                                  [h["volume"] for h in hist])
+        if bar_date:
+            try:
+                os.makedirs(CONFIG["cache_dir"], exist_ok=True)
+                with open(_ind_cache_path(row["symbol"], bar_date, assetclass),
+                          "w", encoding="utf-8") as f:
+                    json.dump(ind, f)
+            except Exception:
+                pass
 
-    hi252 = max(highs[-252:]) if n >= 252 else max(highs)
-    lo252 = min(lows[-252:]) if n >= 252 else min(lows)
-    hi20 = max(highs[-20:])
-    lo20 = min(lows[-20:])
-    pos20 = (last - lo20) / (hi20 - lo20) if hi20 > lo20 else 0.5
-    ret20 = last / closes[-21] - 1 if n >= 21 else 0.0
-    ret60 = last / closes[-61] - 1 if n >= 61 else 0.0
+    last = ind["last"]
+    sma50 = ind["sma50"]
+    sma200 = ind["sma200"]
+    rsi14 = ind["rsi14"]
+    m_line, m_hist, m_hist_prev = ind["macd_line"], ind["macd_hist"], ind["macd_hist_prev"]
+    a = ind["atr"]
+    adx_v = ind["adx"]
+    vol_ratio = ind["vol_ratio"]
+    vol_trend = ind["vol_trend"]
+    atr_pct = ind["atr_pct"]
+    pos20 = ind["pos20"]
+    ret20 = ind["ret20"]
+    hi252 = ind["hi252"]
+    lo252 = ind["lo252"]
+    ret60 = ind["ret60"]
 
     # --- ציון לונג ---
     long_score, long_reasons = 0, []
