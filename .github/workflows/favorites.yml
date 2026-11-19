@@ -1,9 +1,8 @@
 name: NASDAQ Favorites
 
 on:
-  schedule:
-    # 16:25 Asia/Jerusalem (winter, UTC+2) -> 14:25 UTC — מוכן מיד לפני הפתיחה
-    - cron: "25 14 * * *"
+  # בלי ריצות מסביב לפתיחה — רק שתי ריצות מדויקות (16:20 ו-16:40) ב-open.yml.
+  # המועדפים זמינים להפעלה ידנית כאן.
   workflow_dispatch:
 
 jobs:
