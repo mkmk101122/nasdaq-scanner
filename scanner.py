@@ -63,6 +63,10 @@ CONFIG = {
     "atr_stop_mult": 1.5,        # סטופ = 1.5 * ATR
     "reward_risk": 2.0,          # יעד = 2R
     "risk_per_trade": 0.01,      # סיכון 1% מהתיק לעסקה
+    # --- החזקה לטווח יומי + מיקסום רווח (טריילינג על נר יומי) ---
+    "trail_start_r": 1.0,        # מ־+1R הסטופ עובר ל־breakeven (ללא הפסד)
+    "trail_atr_mult": 1.0,       # אחרי +2R הסטופ רץ לאחר 1×ATR
+    "runner_pct": 50,            # 50% מהפוזיציה נשארים לריצה
     "portfolio_examples": [10000, 100000],
     "out_dir": "reports",
     "cache_dir": "cache",
@@ -742,6 +746,18 @@ def build_trade(signal, portfolio):
         return None  # סיכון מוגזם — ללא המלצה
     target_pct = abs(target - entry) / entry * 100
     shares = int(portfolio * CONFIG["risk_per_trade"] / risk)
+    # תוכנית מיקסום רווח (טריילינג להחזקה יומית)
+    tsr = CONFIG["trail_start_r"]
+    tmult = CONFIG["trail_atr_mult"]
+    if signal["direction"] == "LONG":
+        be_stop = entry
+        trail_stop = entry + rr * risk - tmult * a
+    else:
+        be_stop = entry
+        trail_stop = entry - rr * risk + tmult * a
+    plan = (f"ב־+{tsr:g}R סטופ→ברווח ({be_stop:.2f}) · "
+            f"ב־+{rr:g}R סטופ דק ל־{tmult:g}×ATR ({trail_stop:.2f}) · "
+            f"{CONFIG['runner_pct']:g}% רץ")
     return {
         "entry": round(entry, 2),
         "stop": round(stop, 2),
@@ -751,6 +767,9 @@ def build_trade(signal, portfolio):
         "rr": rr,
         "shares": shares,
         "risk_amount": round(portfolio * CONFIG["risk_per_trade"], 0),
+        "be_stop": round(be_stop, 2),
+        "trail_stop": round(trail_stop, 2),
+        "plan": plan,
     }
 
 
@@ -1195,7 +1214,8 @@ def run_brief(args):
         print(f"{i:2}. {s['symbol']:6} {s['direction']:5} ציון {s['score']:2}{gap} | "
               f"מחיר ${s['price']:.2f} (סגירה ${s['close']:.2f}, {fmt_pct(s.get('change_pct'))}) | "
               f"סטופ ${t['stop']:.2f} (-{t['risk_pct']:.1f}%) | יעד ${t['target']:.2f} (+{t['target_pct']:.1f}%) | "
-              f"R:R {t['rr']:.0f} | {t['shares']} מניות")
+              f"R:R {t['rr']:.0f} | {t['shares']} מניות\n"
+              f"    💡 {t['plan']}")
     print(f"\n📄 רשימת מעקב: {CONFIG['watchlist_file']}")
     return {"favorites": favs, "meta": meta, "items": items}
 
