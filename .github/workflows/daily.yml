@@ -1,9 +1,7 @@
 name: NASDAQ Daily Report
 
 on:
-  schedule:
-    # 23:15 Asia/Jerusalem (winter, UTC+2) -> 21:15 UTC
-    - cron: "15 21 * * *"
+  # הדוח היומי הוסר מהלוח — זמין להפעלה ידנית בלבד.
   workflow_dispatch:
 
 jobs:
