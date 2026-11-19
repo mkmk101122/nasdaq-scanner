@@ -68,6 +68,11 @@ CONFIG = {
     "cache_dir": "cache",
     "watchlist_file": "watchlist.json",
     "favorites_min_score": 12,   # סף ציון למועדפים מול הפתיחה
+    "favorites_limit": 20,       # גודל רשימת המועדפים
+    "favorites_max_per_sector": 4,  # מגוון: לא יותר מ־4 מאותו סקטור
+    # שער איתקנות: מועדפים מובילים רק כאלה שיש להם מגמה אמיתית (ADX) —
+    # מסנן עסקאות רכות שצורכות מחזור אבל אין להן כיוון.
+    "favorites_min_adx": 25.0,
     # --- מסנני איכות סיגנל (שיפור אסטרטגיה) ---
     "adx_min": 20.0,             # ADX מינימלי — עוצמת מגמה (מסנן שוק לטיני/רוח)
     "max_atr_pct": 8.0,          # ATR% מקסימלי — תנודתיות סבירה (מסנן סיכון מוגזם)
@@ -781,16 +786,28 @@ def save_watchlist(favs, meta):
     return items
 
 
-def pick_favorites(signals, trades, limit=15, gap_exclude=5.0):
-    """מועדפים לקראת הפתיחה: ציון גבוה + ללא פער קיצוני.
+def pick_favorites(signals, trades, limit=None, gap_exclude=5.0):
+    """מועדפים לקראת הפתיחה: ציון גבוה + ללא פער קיצוני + מגוון סקטורות.
 
     gap_exclude: אחוז פער נגד כיוון העסקה שמזניק את המניה מהרשימה.
     """
+    if limit is None:
+        limit = CONFIG.get("favorites_limit", 20)
+    max_per_sector = CONFIG.get("favorites_max_per_sector", 4)
+    sector_count = {}
     out = []
     for s, t in zip(signals, trades):
         if t is None:
             continue
         if s["score"] < CONFIG["favorites_min_score"]:
+            continue
+        # שער איתקנות: מגמה חזקה בלבד (ADX) — מסנן עסקאות רכות ללא כיוון
+        min_adx = CONFIG.get("favorites_min_adx", 0.0) or 0.0
+        if min_adx and s.get("adx") is not None and s["adx"] < min_adx:
+            continue
+        # מגוון: לא יותר מ־N מניות מאותו סקטור
+        sec = s.get("sector") or ""
+        if max_per_sector and sector_count.get(sec, 0) >= max_per_sector:
             continue
         chg = s.get("change_pct") or 0.0
         if s["direction"] == "LONG" and chg <= -gap_exclude:
@@ -804,6 +821,7 @@ def pick_favorites(signals, trades, limit=15, gap_exclude=5.0):
         elif s["direction"] == "SHORT" and chg <= -8.0:
             s["quality"] = s.get("quality", 0.0) - (-8.0 - chg) / 5.0
             s["gap_flag"] = True
+        sector_count[sec] = sector_count.get(sec, 0) + 1
         out.append((s, t))
     out.sort(key=lambda x: (x[0]["score"], x[0].get("quality", 0.0)), reverse=True)
     return out[:limit]

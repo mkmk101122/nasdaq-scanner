@@ -2,9 +2,9 @@ name: NASDAQ Open
 
 on:
   schedule:
-    # 16:30-16:45 Asia/Jerusalem (winter, UTC+2) -> 14:30-14:45 UTC
-    # רק בימי חול, רק 4 ריצות (כל 5 דקות ב-15 הדקות הראשונות של הפתיחה)
-    - cron: "30,35,40,45 14 * * 1-5"
+    # 16:20 ו-16:40 Asia/Jerusalem (winter, UTC+2) -> 14:20 / 14:40 UTC
+    # פשוט שתי ריצות: 10 דקות לפני הפתיחה ו-10 דקות אחריה
+    - cron: "20,40 14 * * 1-5"
   workflow_dispatch:
 
 jobs:

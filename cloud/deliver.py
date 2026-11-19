@@ -96,6 +96,7 @@ def main():
     lines = [f"{titles[args.mode]} | {meta.get('now_il', '')} | "
              f"{meta.get('market_status', '')}"]
     lines.append(f"סרוקו: {meta.get('scanned', '?')} | מועדפים: {len(items)}")
+    lines.append("⏱ סגנון: מסחר יומי · טווח החזקה: יום–יומיים מסחר")
     lines.append("")
     if not items:
         lines.append("אין מועדפים חזקים כרגע.")
