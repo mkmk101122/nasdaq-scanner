@@ -5,3 +5,5 @@ __pycache__/
 watchlist.json
 brief_run.log
 scan_run.log
+tracking/outcomes.jsonl
+tracking/summary.md

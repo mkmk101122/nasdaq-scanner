@@ -26,8 +26,23 @@ jobs:
           restore-keys: |
             nasdaq-cache-
 
+      # מדידת תוצאות: נשמר מכל ריצה (מפתח מתגלגל, restore-keys למציאת האחרון)
+      - name: Restore tracking state
+        uses: actions/cache@v4
+        with:
+          path: tracking
+          key: nasdaq-tracking-${{ github.run_id }}
+          restore-keys: |
+            nasdaq-tracking-
+
       - name: Run full scan
         run: python3 scanner.py --universe 2000 --etf-limit 625 --top 15
+
+      - name: Record signals for tracking
+        run: python3 tracker.py snapshot
+
+      - name: Score recorded signals
+        run: python3 tracker.py score --max-days 5
 
       - name: Upload report
         uses: actions/upload-artifact@v4
