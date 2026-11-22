@@ -104,6 +104,17 @@ def main():
         lines.append("אין מועדפים חזקים כרגע.")
     for n, item in enumerate(items[:15], 1):
         lines.append(fmt_item(item, n))
+    # מדידת תוצאות — משולבת בדוח היומי (אם הופקה בריצה)
+    if args.mode == "daily":
+        try:
+            with open("tracking_block.txt", encoding="utf-8") as f:
+                blk = f.read().strip()
+        except Exception:
+            blk = ""
+        if blk:
+            lines.append("")
+            lines.extend(blk.splitlines())
+
     lines.append("")
     lines.append("⚠️ למטרות מחקר בלבד, אינו ייעוץ השקעה.")
 

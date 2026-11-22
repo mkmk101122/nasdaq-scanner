@@ -225,6 +225,13 @@ def cmd_score(args):
         for r in rows:
             f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
+    if args.summary_out:
+        try:
+            with open(args.summary_out, "w", encoding="utf-8") as f:
+                f.write("\n".join(summary_lines(rows)) + "\n")
+            print(f"📄 בלוק סיכום: {args.summary_out}")
+        except Exception as exc:
+            print(f"⚠️  לא נשמר בלוק סיכום: {exc}")
     if skipped:
         print(f"⚠️  לא נמצאה היסטוריה עבור: {', '.join(sorted(set(skipped)))}")
     _print_summary(rows)
@@ -251,6 +258,33 @@ def _metrics(rows):
         "best_r": max(rs),
         "worst_r": min(rs),
     }
+
+
+def summary_lines(rows):
+    """בלוק קצר להצגה בדוח היומי (כמה שורות בלבד)."""
+    m = _metrics(rows)
+    if not m:
+        return ["📈 מדידת תוצאות: אין נתונים עדיין."]
+    out = [f"📈 מדידת תוצאות ({m['n']} עסקאות) | "
+           f"יעד {m['target_pct']:.0f}% · סטופ {m['stops']} · פתוח {m['running']} | "
+           f"ממוצע {m['avg_r']:+.2f}R"]
+    seg = []
+    for dirn in ("LONG", "SHORT"):
+        mm = _metrics([r for r in rows if r["direction"] == dirn])
+        if mm:
+            seg.append(f"{dirn} {mm['n']} ({mm['target_pct']:.0f}% · {mm['avg_r']:+.2f}R)")
+    if seg:
+        out.append("   " + " | ".join(seg))
+    buckets = {}
+    for r in rows:
+        buckets.setdefault(r.get("score"), []).append(r)
+    if buckets:
+        seg = []
+        for sc in sorted(buckets, reverse=True):
+            mm = _metrics(buckets[sc])
+            seg.append(f"{sc}: {mm['target_pct']:.0f}%/ {mm['avg_r']:+.2f}R")
+        out.append("   לפי ציון — " + " | ".join(seg))
+    return out
 
 
 def _print_summary(rows):
@@ -319,6 +353,8 @@ def main():
                     help="כמה נרות יומיים לבדוק אחרי הכניסה (ברירת מחדל 5)")
     sc.add_argument("--refresh", action="store_true",
                     help="נתק מטמון ושלף היסטוריה מחדש (איטי, דורש רשת)")
+    sc.add_argument("--summary-out", default=None,
+                    help="כתוב בלוק סיכום קצר לקובץ (לשילוב בדוח היומי)")
     args = ap.parse_args()
     if args.cmd == "snapshot":
         return cmd_snapshot(args)
