@@ -2,11 +2,15 @@ name: NASDAQ Open
 
 on:
   schedule:
-    # 16:10 ו-16:30 Asia/Jerusalem (winter, UTC+2) -> 14:10 / 14:30 UTC
-    # הראשונה מגיעה 10 דקות לפני הפתיחה (סריקה ~16:10) · השנייה מתחילה ברגע
-    # הפתיחה ומגיעה כאשר הסריקה מסתיימת (~16:40)
-    - cron: "10,30 14 * * 1-5"
+    # 16:05 Asia/Jerusalem (winter, UTC+2) -> 14:05 UTC
+    # סריקת הפתיחה — מגיעה כשהסורק מסתיים (או ליד הפתיחה).
+    - cron: "5 14 * * 1-5"
   workflow_dispatch:
+
+# שתי ריצות של אותה workflow (מתוזמנת + ידנית) לא יחלפו זו את זו.
+concurrency:
+  group: nasdaq-open
+  cancel-in-progress: false
 
 jobs:
   scan:

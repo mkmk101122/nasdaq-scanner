@@ -68,6 +68,7 @@ def fmt_item(item, n):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--mode", choices=["daily", "brief", "watch", "open"], required=True)
+    ap.add_argument("--title", default="", help="כותרת מותאמת שמחליפה את כותרת ברירת המחדל")
     args = ap.parse_args()
 
     wl = load_watchlist()
@@ -95,7 +96,8 @@ def main():
         "watch": "👁 <b>מעקב נאסדק — שינוי ברשימה</b>",
         "open": "🚀 <b>פתיחת שוק — עדכון כל 5 דקות</b>",
     }
-    lines = [f"{titles[args.mode]} | {meta.get('now_il', '')} | "
+    title = args.title or titles[args.mode]
+    lines = [f"{title} | {meta.get('now_il', '')} | "
              f"{meta.get('market_status', '')}"]
     lines.append(f"סרוקו: {meta.get('scanned', '?')} | מועדפים: {len(items)}")
     lines.append("⏱ סגנון: מסחר יומי · טווח החזקה: יום–יומיים מסחר")
