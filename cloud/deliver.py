@@ -60,9 +60,11 @@ def fmt_item(item, n):
     ratio = f" | R:R {rr:.0f}" if rr is not None else ""
     plan = item.get("plan")
     plan_line = f"\n    💡 {plan}" if plan else ""
+    adx = item.get("adx")
+    adx_line = f" | ADX {adx:.0f}" if isinstance(adx, (int, float)) else ""
     return (f"{n}. <b>{item['symbol']}</b> {item['direction']} | "
             f"ציון {item['score']} | ${item['price']:.2f} | "
-            f"{stop} | {tgt}{ratio}{plan_line}")
+            f"{stop} | {tgt}{ratio}{adx_line}{plan_line}")
 
 
 def main():

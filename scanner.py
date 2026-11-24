@@ -74,6 +74,7 @@ CONFIG = {
     "favorites_min_score": 12,   # סף ציון למועדפים מול הפתיחה
     "favorites_limit": 20,       # גודל רשימת המועדפים
     "favorites_max_per_sector": 4,  # מגוון: לא יותר מ־4 מאותו סקטור
+    "favorites_min_dv": 50e6,     # מחזור דולרי מינימלי למועדף (נזילות מספקת)
     # שער איתקנות: מועדפים מובילים רק כאלה שיש להם מגמה אמיתית (ADX) —
     # מסנן עסקאות רכות שצורכות מחזור אבל אין להן כיוון.
     "favorites_min_adx": 25.0,
@@ -614,9 +615,11 @@ def analyze(row, hist, regime=None):
     if pos20 >= 0.8:
         long_score += 1; long_reasons.append("קרוב לשיא 20 יום")
     if last >= hi252 * 0.9:
-        long_score += 1
+        long_score += 1; long_reasons.append("קרוב לשיא 52 שבועות")
     if ret20 >= 0.05:
         long_score += 1
+    if adx_v is not None and adx_v >= 25:
+        long_score += 1; long_reasons.append("ADX מגמה חזקה")
     if last < sma50:
         long_score -= 3
 
@@ -643,9 +646,11 @@ def analyze(row, hist, regime=None):
     if pos20 <= 0.2:
         short_score += 1; short_reasons.append("קרוב לשפל 20 יום")
     if last <= lo252 * 1.1:
-        short_score += 1
+        short_score += 1; short_reasons.append("קרוב לשפל 52 שבועות")
     if ret20 <= -0.05:
         short_score += 1
+    if adx_v is not None and adx_v >= 25:
+        short_score += 1; short_reasons.append("ADX מגמה חזקה")
     if last > sma50:
         short_score -= 3
 
@@ -792,7 +797,9 @@ def save_watchlist(favs, meta):
             "direction": s["direction"], "score": s["score"],
             "quality": s.get("quality"), "price": s["price"],
             "close": s.get("close"), "change_pct": s.get("change_pct"),
-            "rsi": s["rsi"], "entry": t["entry"], "stop": t["stop"],
+            "rsi": s["rsi"], "adx": s.get("adx"),
+            "vol_ratio": s.get("vol_ratio"), "atr_pct": s.get("atr_pct"),
+            "entry": t["entry"], "stop": t["stop"],
             "target": t["target"], "risk_pct": t["risk_pct"],
             "target_pct": t["target_pct"], "rr": t["rr"], "shares": t["shares"],
         })
@@ -822,7 +829,11 @@ def pick_favorites(signals, trades, limit=None, gap_exclude=5.0):
             continue
         # שער איתקנות: מגמה חזקה בלבד (ADX) — מסנן עסקאות רכות ללא כיוון
         min_adx = CONFIG.get("favorites_min_adx", 0.0) or 0.0
-        if min_adx and s.get("adx") is not None and s["adx"] < min_adx:
+        if s.get("adx") is not None and s["adx"] < min_adx:
+            continue
+        # נזילות מספקת: מועדף דורש מחזור דולרי מינימלי
+        min_dv = CONFIG.get("favorites_min_dv", 0.0) or 0.0
+        if min_dv and (s.get("dollar_volume") or 0.0) < min_dv:
             continue
         # מגוון: לא יותר מ־N מניות מאותו סקטור
         sec = s.get("sector") or ""
