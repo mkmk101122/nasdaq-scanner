@@ -49,6 +49,31 @@ def load_watchlist():
         return {"items": [], "meta": {}}
 
 
+def load_latest_signals():
+    """דוח יומי: נתוני הסריקה האחרונים (signals_*.json) כמקור אמת,
+    כי watchlist.json נכתב רק על ידי --brief/--watch."""
+    import glob
+    files = sorted(glob.glob(os.path.join("reports", "signals_*.json")))
+    if not files:
+        return None
+    try:
+        with open(files[-1], encoding="utf-8") as f:
+            d = json.load(f)
+    except Exception:
+        return None
+    items = []
+    for s, t in zip(d.get("signals", []), d.get("trades", [])):
+        if t is None:
+            continue
+        s = dict(s)
+        s.update({"entry": t["entry"], "stop": t["stop"], "target": t["target"],
+                  "risk_pct": t["risk_pct"], "target_pct": t["target_pct"],
+                  "rr": t["rr"], "shares": t["shares"], "plan": t.get("plan"),
+                  "gap_flag": False})
+        items.append(s)
+    return {"items": items, "meta": d.get("meta", {})}
+
+
 def fmt_item(item, n):
     rp = item.get("risk_pct")
     tp = item.get("target_pct")
@@ -74,6 +99,10 @@ def main():
     args = ap.parse_args()
 
     wl = load_watchlist()
+    if args.mode == "daily":
+        sig = load_latest_signals()
+        if sig and sig["items"]:
+            wl = sig
     items = wl.get("items", [])
     meta = wl.get("meta", {})
 
