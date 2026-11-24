@@ -2,10 +2,9 @@ name: NASDAQ Open Pre
 
 on:
   schedule:
-    # 15:45 Asia/Jerusalem (winter, UTC+2) -> 13:45 UTC
-    # סריקה מוקדמת שמספקת תמונה לפני הפתיחה (45 דקות לפני).
-    # מרוצה בנפרד מ-NASDAQ Open כדי שריצה אחת לא תדחוף את השנייה.
-    - cron: "45 13 * * 1-5"
+    # 16:20 Asia/Jerusalem (winter, UTC+2) -> 14:20 UTC
+    # סריקה מוקדמת — תמונה לפני פתיחת השוק.
+    - cron: "20 14 * * 1-5"
   workflow_dispatch:
 
 # שתי ריצות של אותה workflow (מתוזמנת + ידנית) לא יחלפו זו את זו.

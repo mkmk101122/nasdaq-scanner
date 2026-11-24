@@ -2,9 +2,9 @@ name: NASDAQ Open
 
 on:
   schedule:
-    # 16:05 Asia/Jerusalem (winter, UTC+2) -> 14:05 UTC
-    # סריקת הפתיחה — מגיעה כשהסורק מסתיים (או ליד הפתיחה).
-    - cron: "5 14 * * 1-5"
+    # 16:40 Asia/Jerusalem (winter, UTC+2) -> 14:40 UTC
+    # סריקת הפתיחה — מגיעה כשהסורק מסתיים, כ-10 דקות אחרי פתיחת השוק.
+    - cron: "40 14 * * 1-5"
   workflow_dispatch:
 
 # שתי ריצות של אותה workflow (מתוזמנת + ידנית) לא יחלפו זו את זו.
