@@ -1,7 +1,9 @@
 name: NASDAQ Daily Report
 
 on:
-  # הדוח היומי הוסר מהלוח — זמין להפעלה ידנית בלבד.
+  schedule:
+    # 21:15 UTC = 23:15 Asia/Jerusalem (winter, UTC+2) — אחרי סגירת השוק.
+    - cron: "15 21 * * 1-5"
   workflow_dispatch:
 
 jobs:
@@ -36,7 +38,7 @@ jobs:
             nasdaq-tracking-
 
       - name: Run full scan
-        run: python3 scanner.py --universe 2000 --etf-limit 625 --top 15
+        run: python3 scanner.py --universe 2000 --etf-limit 625 --top 15 --refresh
 
       - name: Record signals for tracking
         run: python3 tracker.py snapshot
