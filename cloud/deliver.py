@@ -94,7 +94,7 @@ def main():
         "daily": "📊 <b>סורק נאסדק — דוח יומי</b>",
         "brief": "⭐ <b>מועדפים לקראת הפתיחה</b>",
         "watch": "👁 <b>מעקב נאסדק — שינוי ברשימה</b>",
-        "open": "🚀 <b>פתיחת שוק — עדכון כל 5 דקות</b>",
+        "open": "🚀 <b>פתיחת שוק</b>",
     }
     title = args.title or titles[args.mode]
     lines = [f"{title} | {meta.get('now_il', '')} | "
